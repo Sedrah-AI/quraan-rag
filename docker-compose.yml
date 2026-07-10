@@ -1,0 +1,212 @@
+# Quran RAG microservice stack.
+#
+# Ollama is intentionally NOT included here - it stays a host systemd
+# service (OLLAMA_KEEP_ALIVE=5m idle-unload already working correctly;
+# containerizing it would add a second GPU-allocation code path for zero
+# behavior change). Services reach it via host.docker.internal:11434.
+#
+# GPU allocation: Milvus keeps device_ids ["0"] as before. retrieval-,
+# pronunciation-, and tajweed-service are consolidated onto device_ids
+# ["1"] - these are bursty, low-duty-cycle inference calls (not
+# continuous training), so sharing one index keeps the other 6 GPUs on
+# this shared research box free for unrelated jobs.
+
+services:
+  # ── Data tier ──────────────────────────────────────────────────────
+  postgres:
+    container_name: quran-postgres
+    image: postgres:16
+    environment:
+      POSTGRES_DB: quran_content
+      POSTGRES_USER: quran
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quran_dev_password}
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-/data/quraan-rag/data}/postgres_volumes:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quran -d quran_content"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-/data/quraan-rag/data/milvus_volumes}/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-/data/quraan-rag/data/milvus_volumes}/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.6.19-gpu
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-/data/quraan-rag/data/milvus_volumes}/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["0"]
+    depends_on:
+      - etcd
+      - minio
+
+  # ── App tier ───────────────────────────────────────────────────────
+  content-service:
+    container_name: content-service
+    build: ./quraan-agent/services/content-service
+    environment:
+      - DATABASE_URL=postgresql://quran:${POSTGRES_PASSWORD:-quran_dev_password}@postgres:5432/quran_content
+      - QURAN_DATASET_ROOT=/audio-data
+    volumes:
+      - ${QURAN_DATASET_ROOT_HOST:-/data/quraan-rag/data/quran-audio-text-dataset}:/audio-data:ro
+    ports:
+      - "8101:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  retrieval-service:
+    container_name: retrieval-service
+    build: ./quraan-agent/services/retrieval-service
+    environment:
+      - MILVUS_URI=http://standalone:19530
+      - CONTENT_SERVICE_URL=http://content-service:8000
+      - FORCE_CPU=${FORCE_CPU:-0}
+    ports:
+      - "8102:8000"
+    depends_on:
+      - standalone
+      - content-service
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["1"]
+
+  generation-service:
+    container_name: generation-service
+    build: ./quraan-agent/services/generation-service
+    environment:
+      - CONTENT_SERVICE_URL=http://content-service:8000
+      - ANSWER_BACKEND=${ANSWER_BACKEND:-local}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LOCAL_BASE_URL=http://host.docker.internal:11434/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8103:8000"
+    depends_on:
+      - content-service
+
+  pronunciation-service:
+    container_name: pronunciation-service
+    build: ./quraan-agent/services/pronunciation-service
+    environment:
+      - CONTENT_SERVICE_URL=http://content-service:8000
+      - GENERATION_SERVICE_URL=http://generation-service:8000
+      - WHISPER_MODEL_DIR=/models/quran-whisper
+      - FORCE_CPU=${FORCE_CPU:-0}
+    volumes:
+      - /data/quraan-rag/models/quran-whisper:/models/quran-whisper:ro
+    ports:
+      - "8104:8000"
+    depends_on:
+      - content-service
+      - generation-service
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["1"]
+
+  tajweed-service:
+    container_name: tajweed-service
+    build: ./quraan-agent/services/tajweed-service
+    environment:
+      - TAJWEED_MODEL_DIR=/models/wav2vec2-tajweed
+      - GOLDEN_EMBEDDINGS_DIR=/data/golden_embeddings
+      - FORCE_CPU=${FORCE_CPU:-0}
+    volumes:
+      - /data/quraan-rag/models/wav2vec2-tajweed:/models/wav2vec2-tajweed:ro
+      - ./quraan-agent/data/golden_embeddings:/data/golden_embeddings:ro
+    ports:
+      - "8105:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["1"]
+
+  gateway-service:
+    container_name: gateway-service
+    build: ./quraan-agent/services/gateway-service
+    environment:
+      - CONTENT_SERVICE_URL=http://content-service:8000
+      - RETRIEVAL_SERVICE_URL=http://retrieval-service:8000
+      - GENERATION_SERVICE_URL=http://generation-service:8000
+      - PRONUNCIATION_SERVICE_URL=http://pronunciation-service:8000
+      - PRONUNCIATION_SERVICE_WS_URL=ws://pronunciation-service:8000
+    restart: always
+    ports:
+      # Cutover complete: every flow verified against the legacy monolith
+      # on 8001 first (see wiki/commit history), monolith then stopped
+      # (systemctl stop quraan-agent - unit left enabled, not deleted,
+      # for a rollback-safe period), gateway takes over 8000.
+      - "8000:8000"
+    depends_on:
+      - content-service
+      - retrieval-service
+      - generation-service
+      - pronunciation-service
+
+networks:
+  default:
+    name: quran-net

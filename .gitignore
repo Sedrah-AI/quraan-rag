@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Local convenience symlink to the actual data root (docker-compose reads
+# /data/quraan-rag/data directly via DOCKER_VOLUME_DIRECTORY, so this isn't
+# required, and the absolute target isn't portable across machines).
+/data
+
+.claude/settings.local.json

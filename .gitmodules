@@ -1,0 +1,6 @@
+[submodule "quraan-agent"]
+	path = quraan-agent
+	url = https://github.com/Sedrah-AI/quraan-agent.git
+[submodule "wiki"]
+	path = wiki
+	url = https://github.com/Sedrah-AI/quraan-agent.wiki.git
