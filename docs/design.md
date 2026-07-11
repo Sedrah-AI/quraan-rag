@@ -1051,3 +1051,286 @@ rather than rebuilt):
 - **No automated tests** for `reference.py`, `milvus_store.py`, or the
   tafsir import/matching logic — `tests/test_agent.py` only covers the
   original agent/vector_store basics.
+
+## 14. Guided recitation and memorization UI (design, not yet built)
+
+Date: 2026-07-10
+
+Goal: a full-page Mushaf view where the agent leads recitation out loud
+with synchronized verse- and word-level highlighting, the user can stop
+it and re-trigger any verse or single word on demand (e.g. to hear a
+hard word again), and the same page can flip into a memorization test
+mode that hides words/ayahs for recall practice. This sits alongside the
+existing 3.2 (playback/guidance) and 3.4 (memorization) product goals —
+this section makes them concrete enough to build.
+
+**Hard constraint carried over from section 6.5**: agent-led playback
+must use authentic reciter audio, never TTS/generated recitation. This
+section only sequences and highlights recordings that already exist in
+the dataset; it adds no new audio synthesis.
+
+### 14.1 Two audio sources, used for two different jobs
+
+The dataset already gives us two different granularities of authentic
+audio, and they map cleanly onto two different UI actions instead of
+needing one system to do both:
+
+- **`ayah_audio`** (187,080 continuous full-verse recordings) — used for
+  agent-led verse playback. Continuous speech preserves connected-speech
+  tajweed rules (idgham, madd, qalqalah, etc.) that only exist *across*
+  word boundaries, which isolated word clips cannot demonstrate. This is
+  the audio the user hears when the agent "recites."
+- **`words`** (77,429 isolated word recordings, already has
+  `audio_asset_id` per `(surah_id, ayah_id, word_index)`, confirmed
+  populated in `data/quran_metadata.sqlite3`) — used only for the
+  on-demand "replay this one word" action when a user taps/highlights a
+  word they find difficult. No new data needed for this path at all.
+
+Word highlighting *during* verse playback is the one piece that needs
+new data: knowing when each word starts/ends inside the continuous
+`ayah_audio` clip.
+
+### 14.2 Word-level timing via CTC forced alignment — DONE (2026-07-11)
+
+The canonical Arabic text of every ayah is already known exactly (it's
+in `ayahs.ayah_ar`), so this is forced alignment (align known text to
+audio), not open transcription — a materially easier and more reliable
+problem than ASR, and it does not require our fine-tuned
+`models/quran-whisper/` (a seq2seq model; its cross-attention timestamps
+are coarser and less suited to this than CTC) or the tajweed-service
+wav2vec2 model (that checkpoint was contrastively trained into a
+256-dim embedding head for similarity scoring — it has no CTC output
+layer and cannot produce frame-level character probabilities).
+
+Shipped approach:
+
+1. `jonatasgrosman/wav2vec2-large-xlsr-53-arabic` (off-the-shelf, no
+   fine-tuning — forced alignment only needs boundary precision, not
+   recognition accuracy, since the text is already known). Its vocab is
+   plain undiacritized Arabic characters, so the canonical text is
+   harakat-stripped before alignment (using `embeddings.py`'s
+   `ARABIC_DIACRITICS_RE` directly — see the regex-bug note below for
+   why this wasn't hand-retyped).
+2. `quraan_agent/ctc_align.py`: a from-scratch, vectorized (no Python-level
+   loop over label positions) CTC Viterbi forced-alignment implementation,
+   not `torchaudio.functional.forced_align` — the installed torch build
+   (2.12.1+cu130) has no matching torchaudio wheel yet, and forced_align
+   is a C++ extension needing exact ABI compatibility, an avoidable risk
+   to a shared venv other services depend on for a ~30-line algorithm.
+3. Character-level alignment collapsed to word-level `start_ms`/`end_ms`
+   by splitting on the model's word-delimiter token (`quraan_agent/ctc_align.py::word_frame_ranges`).
+4. Per-ayah confidence = exp(mean per-frame log-prob along the winning
+   Viterbi path).
+
+New table, shipped in both SQLite and Postgres (`infra/postgres/init.sql`,
+`scripts/migrate_metadata_to_postgres.py`):
+
+```sql
+CREATE TABLE ayah_word_timings (
+  surah_id      INTEGER NOT NULL,
+  ayah_id       INTEGER NOT NULL,
+  reciter_id    TEXT NOT NULL REFERENCES reciters(reciter_id),
+  word_index    INTEGER NOT NULL,
+  start_ms      INTEGER NOT NULL,
+  end_ms        INTEGER NOT NULL,
+  confidence    DOUBLE PRECISION,
+  align_model   TEXT,
+  PRIMARY KEY (surah_id, ayah_id, reciter_id, word_index),
+  FOREIGN KEY (surah_id, ayah_id, word_index) REFERENCES words(surah_id, ayah_id, word_index)
+);
+```
+
+**Result**: full corpus, one reciter (`minshawy_murattal`) — **77,429/77,429
+words aligned (100%), 6,236/6,236 ayahs covered (100%), 0 monotonicity
+violations, 0 word-count mismatches**. Confidence distribution: p10=0.53,
+p50=0.69, p90=0.91, min=0.31 (2:282, the longest ayah in the Quran —
+expected, per the risk noted in 14.7), max=0.98. Migration verified
+(row counts + byte-level spot-check, same standard as the rest of this
+project's Postgres sync).
+
+Scope stayed v1 as planned: only the default reciter is aligned; other
+reciters can be added later via the same script with no schema change,
+each reciter's rows keyed independently by `reciter_id`.
+
+**Real bugs hit and fixed during this run** (kept here rather than
+silently fixed, matching this project's own convention in the wiki's
+"Real bugs found during the build-out" section):
+
+1. **Thread oversubscription (performance, not correctness)**: an early
+   full-run attempt spent ~15 wall-clock minutes accumulating ~14.7
+   CPU-*hours* across 235 threads without finishing a single ayah.
+   `torch.set_num_threads(1)` only limits torch's own intra-op dispatch,
+   not the OpenMP/MKL/OpenBLAS thread pools those libraries spin up
+   independently at import time (measured 66 threads/worker even with
+   that call in place). Fixed by setting `OMP_NUM_THREADS`,
+   `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `NUMEXPR_NUM_THREADS`,
+   `VECLIB_MAXIMUM_THREADS` to `1` before numpy/torch/scipy import.
+2. **Scrambled diacritics regex (correctness, silent)**: while
+   parallelizing across ayahs (this box's 208 CPU cores, all 8 GPUs
+   already saturated by other jobs), the diacritic-stripping regex was
+   hand-retyped with literal Arabic characters and its range order got
+   scrambled by bidi rendering — it silently matched *base letters too*,
+   not just diacritics (`بِسْمِ` → `''`, wiping whole words). This is the
+   exact same failure mode already hit once before porting the same
+   regex into pronunciation-service (see
+   [Microservice-Architecture](../wiki/Microservice-Architecture.md)).
+   It surfaced as 100% alignment failures rather than corrupted-but-
+   plausible-looking output only because an empty target sequence makes
+   `word_frame_ranges` return zero words, which trips the word-count
+   check — a differently-shaped bug could have shipped silently-wrong
+   timings instead. Fixed by importing `embeddings.py`'s
+   `ARABIC_DIACRITICS_RE` directly instead of retyping the character
+   class.
+3. **Embedded space inside one `words`-table row**: 37:130's word_index 3
+   ("Ilyasin") is stored as two space-separated tokens in one row. Spaces
+   were originally treated as word-delimiters even *within* a single
+   row's text, splitting it into two `word_frame_ranges` entries (the
+   sole failure in the first full run, 6,235/6,236). Fixed by only
+   delimiting *between* `words`-table rows, not on any embedded space
+   inside one row's text; backfilled the single affected ayah rather
+   than re-running the full corpus.
+
+### 14.3 Mushaf page layout — DONE (2026-07-10)
+
+Sourced and ingested: **Tanzil's `quran-data.xml`**
+(https://tanzil.net/docs/quran_metadata, CC-BY, downloaded to
+`/data/quraan-rag/data/mushaf_layout_raw/`, see its `SOURCE_README.md`).
+This is the same upstream source quran.ksu.edu.sa itself credits and
+builds on — going directly to Tanzil avoided scraping a JS SPA with no
+documented API for the same underlying data.
+
+The file stores **boundary markers**, not a per-ayah/per-line table:
+`<page index="N" sura="S" aya="A" />` means page N begins at ayah S:A
+(same shape for `juz`/`manzil`/`ruku`). `scripts/import_mushaf_layout.py`
+converts each `(sura, aya)` to a single global ayah ordinal (via each
+`<sura>`'s `start` offset) and, for every ayah in our own `ayahs` table,
+finds the latest boundary at or before it.
+
+Actual schema shipped (simpler than the line-based draft originally
+sketched here, since the source has no line-level data at all — see
+the known limitation below):
+
+```sql
+CREATE TABLE mushaf_pages (
+  surah_id     INTEGER NOT NULL,
+  ayah_id      INTEGER NOT NULL,
+  page_number  INTEGER NOT NULL,
+  juz          INTEGER,
+  manzil       INTEGER,
+  ruku_global  INTEGER,
+  PRIMARY KEY (surah_id, ayah_id),
+  FOREIGN KEY (surah_id, ayah_id) REFERENCES ayahs(surah_id, ayah_id)
+);
+```
+
+Validated: all 6,236 ayahs mapped, exactly 604 distinct pages (page 1 =
+1:1, page 604 = 112:1–114:6), zero surah ayah-count mismatches against
+the XML's own `<sura ayas="...">` counts. Spot-checked against known
+reference points, not just internal consistency: 2:255 (Ayat al-Kursi)
+→ page 42; the juz-2 boundary (2:142) → page 22 — both match the real
+Madani Mushaf. Report: `quraan-agent/data/manifests/mushaf_layout_import_report.json`.
+Migrated to Postgres (`infra/postgres/init.sql`,
+`scripts/migrate_metadata_to_postgres.py`) — row counts and byte-level
+content spot-checks both verified.
+
+**Known limitation carried forward, not resolved**: no line-level data
+exists in this source, so an ayah that visually spans a page break
+mid-ayah on a physical Mushaf is *not* split here — each ayah is
+assigned wholly to the page it starts on. Acceptable for word-highlight
+playback (this section's actual goal) but not pixel/line-accurate to a
+printed Mushaf. A page/line typesetting dataset would be a separate,
+later sourcing task if that precision is ever needed.
+
+### 14.4 API surface (content-service + gateway)
+
+New content-service endpoints:
+
+- `GET /pages/{page_number}` → ordered list of `{surah_id, ayah_id,
+  line_number, words: [...]}` for that Mushaf page, reusing the existing
+  per-ayah enrichment (tafsir, audio availability).
+- `GET /words/{surah_id}/{ayah_id}/{word_index}/audio` → serves the
+  existing isolated word MP3 (same `FileResponse` pattern as the current
+  `/audio/{reciter_id}/{surah_id}/{ayah_id}`).
+- `GET /ayahs/{surah_id}/{ayah_id}/timings?reciter=...` → word
+  `start_ms`/`end_ms` array plus `confidence`; `null`/omitted when no
+  alignment row exists yet for that reciter, so the frontend can apply
+  the even-interpolation fallback from 14.2.
+
+gateway-service adds thin proxying routes for all three, matching the
+existing pattern in `clients.py`.
+
+### 14.5 Frontend: Recite view
+
+New tab (alongside "Ask the Quran" and "Pronunciation Practice") that
+renders one Mushaf page as a sequence of `<span>`-per-word ayahs (word
+spans keyed by `word_index`, exactly like the comparison grid the
+pronunciation tab already renders word arrays into).
+
+Playback engine (new `recitation.js`, client-side only — no new backend
+statefulness, unlike the live-pronunciation WebSocket which is stateful
+by necessity because it's consuming a live mic stream):
+
+- **Start recitation**: plays each ayah's `ayah_audio` clip in page
+  order via a plain `<audio>` element. On each `timeupdate`, walks the
+  fetched timings array for the current ayah and toggles a `.highlight`
+  class on the word span whose `[start_ms, end_ms)` contains
+  `audio.currentTime`.
+- **Stop**: `audio.pause()` — no server round-trip needed, this is a
+  purely client-side action.
+- **Re-recite this verse**: reset that ayah's `<audio>` to `currentTime
+  = 0` and play — since each ayah is already its own clip, "replay the
+  verse" needs no slicing logic.
+- **Replay this word**: fetch/play the isolated word clip from 14.4
+  instead of seeking within the verse clip — reuses the dataset's
+  existing word-level recordings directly, and is a separate short clip
+  rather than a seek, so it doesn't disturb verse playback position.
+- **Memorization test mode**: pure client-state toggle, no backend
+  change. Selected words/ayahs render as a masked box (fixed-width RTL
+  placeholder) instead of the Arabic text, keyed by the same
+  `word_index`; tapping reveals it. Because there's no user-account
+  system yet (`docs/design.md` section 13.6/wiki already flag "no
+  auth"), persisting which words a given user struggles with is
+  out of scope for v1 — session-local `localStorage` only, matching the
+  no-auth reality rather than building storage for users that don't
+  exist yet. Cross-session mistake history (goal 3.4) becomes possible
+  once accounts exist, not before.
+
+### 14.6 Milestones
+
+1. **DONE (2026-07-10)** — see 14.3. Sourced + license-checked Tanzil's
+   `quran-data.xml`; `scripts/import_mushaf_layout.py`; `mushaf_pages`
+   table added to SQLite and Postgres; 604-page/6,236-ayah coverage
+   validated; migration re-run and verified (counts + byte-level spot
+   check).
+2. **DONE (2026-07-11)** — see 14.2. `scripts/align_ayah_words.py` (CTC
+   forced alignment, parallelized across this box's 208 CPU cores);
+   `ayah_word_timings` table in SQLite and Postgres; full-corpus run for
+   the default reciter, 100% coverage (77,429/77,429 words, 6,236/6,236
+   ayahs), 0 monotonicity violations; migration verified.
+3. content-service: add the three endpoints in 14.4.
+4. gateway-service: proxy routes + static asset wiring.
+5. Frontend: Recite tab — page render, sequential playback with
+   highlighting, stop, per-verse replay, per-word on-demand playback,
+   hide-word memorization mode.
+6. Evaluation: hand-check alignment boundaries against a small
+   human-labeled sample (e.g. 20-30 ayahs spanning short/long/heavy-tajweed
+   cases) before trusting confidence scores as a gating signal.
+
+### 14.7 Known gaps/risks
+
+- **Alignment quality is measured only by internal consistency so far
+  (coverage, monotonicity, confidence), not against human-labeled ground
+  truth** — milestone 6's hand-check (20-30 ayahs spanning short/long/
+  heavy-tajweed cases) hasn't run yet. Confidence scores are a relative
+  signal from the model's own emission probabilities, not a calibrated
+  accuracy estimate; treat p10-range ayahs (~0.53 and below) as
+  "probably fine but unverified," not "confirmed correct."
+- 2:282 (the longest ayah in the Quran) has the lowest confidence in the
+  full run (~0.31) — consistent with the general expectation that very
+  long, melismatic recitations are the hardest case, but not yet
+  confirmed by manual review whether that specific ayah's boundaries
+  are actually degraded or just naturally scored lower.
+- v1 covers one reciter's timings (`minshawy_murattal`); switching
+  reciters in the Recite tab either falls back to interpolated
+  highlighting or is disabled until that reciter is aligned too.
+- No cross-session memorization progress until user accounts exist.

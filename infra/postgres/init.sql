@@ -66,10 +66,46 @@ CREATE TABLE tafsir_passages (
   FOREIGN KEY (surah_id, ayah_id) REFERENCES ayahs(surah_id, ayah_id)
 );
 
+-- Derived from Tanzil's quran-data.xml (CC-BY) - see
+-- quraan-agent/scripts/import_mushaf_layout.py and
+-- /data/quraan-rag/data/mushaf_layout_raw/SOURCE_README.md. One row per
+-- ayah (the source only has page-level boundaries, no line-level data).
+CREATE TABLE mushaf_pages (
+  surah_id     INTEGER NOT NULL,
+  ayah_id      INTEGER NOT NULL,
+  page_number  INTEGER NOT NULL,
+  juz          INTEGER,
+  manzil       INTEGER,
+  ruku_global  INTEGER,
+  PRIMARY KEY (surah_id, ayah_id),
+  FOREIGN KEY (surah_id, ayah_id) REFERENCES ayahs(surah_id, ayah_id)
+);
+
+-- Word-level start/end timestamps within one reciter's ayah_audio clip,
+-- from CTC forced alignment (known text, unknown timing - not open ASR)
+-- against jonatasgrosman/wav2vec2-large-xlsr-53-arabic. See
+-- quraan-agent/scripts/align_ayah_words.py and quraan_agent/ctc_align.py.
+-- Full-corpus run (minshawy_murattal): 77,429/77,429 words aligned,
+-- 6,236/6,236 ayahs covered, 0 monotonicity violations.
+CREATE TABLE ayah_word_timings (
+  surah_id     INTEGER NOT NULL,
+  ayah_id      INTEGER NOT NULL,
+  reciter_id   TEXT NOT NULL REFERENCES reciters(reciter_id),
+  word_index   INTEGER NOT NULL,
+  start_ms     INTEGER NOT NULL,
+  end_ms       INTEGER NOT NULL,
+  confidence   DOUBLE PRECISION,
+  align_model  TEXT,
+  PRIMARY KEY (surah_id, ayah_id, reciter_id, word_index),
+  FOREIGN KEY (surah_id, ayah_id, word_index) REFERENCES words(surah_id, ayah_id, word_index)
+);
+
 CREATE INDEX idx_ayahs_ref  ON ayahs(surah_id, ayah_id);
 CREATE INDEX idx_words_ref  ON words(surah_id, ayah_id);
 CREATE INDEX idx_audio_ref  ON ayah_audio(surah_id, ayah_id);
 CREATE INDEX idx_tafsir_ref ON tafsir_passages(surah_id, ayah_id);
+CREATE INDEX idx_word_timings_ref ON ayah_word_timings(surah_id, ayah_id);
+CREATE INDEX idx_mushaf_pages_page ON mushaf_pages(page_number);
 
 -- Fast substring search for the LIKE-fallback tier (today's _text_search()
 -- in app/server.py, moving to a content-service endpoint) - same fallback
