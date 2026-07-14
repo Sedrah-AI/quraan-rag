@@ -113,3 +113,37 @@ CREATE INDEX idx_mushaf_pages_page ON mushaf_pages(page_number);
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX idx_ayahs_en_trgm ON ayahs USING gin (ayah_en gin_trgm_ops);
 CREATE INDEX idx_ayahs_tr_trgm ON ayahs USING gin (ayah_tr gin_trgm_ops);
+
+-- account-service: user accounts + progress history. recitation_events is
+-- an append-only log (not a "current position" pointer table) - resume
+-- position is just the latest 'recited' row per user, and the same rows
+-- power the dashboard, so there's only one source of truth to keep
+-- consistent instead of two.
+CREATE TABLE users (
+  id             SERIAL PRIMARY KEY,
+  email          TEXT NOT NULL UNIQUE,
+  password_hash  TEXT NOT NULL,
+  display_name   TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE recitation_events (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  surah_id    INTEGER NOT NULL,
+  ayah_id     INTEGER NOT NULL,
+  event_type  TEXT NOT NULL,  -- 'recited' | 'memory_miss'
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE pronunciation_attempts (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  surah_id    INTEGER NOT NULL,
+  ayah_id     INTEGER NOT NULL,
+  score       INTEGER NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_recitation_events_user ON recitation_events(user_id, created_at DESC);
+CREATE INDEX idx_pronunciation_attempts_user ON pronunciation_attempts(user_id, created_at DESC);

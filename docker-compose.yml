@@ -185,6 +185,18 @@ services:
               capabilities: ["gpu"]
               device_ids: ["1"]
 
+  account-service:
+    container_name: account-service
+    build: ./quraan-agent/services/account-service
+    environment:
+      - DATABASE_URL=postgresql://quran:${POSTGRES_PASSWORD:-quran_dev_password}@postgres:5432/quran_content
+      - ACCOUNT_JWT_SECRET=${ACCOUNT_JWT_SECRET:-dev-only-insecure-secret-override-me}
+    ports:
+      - "8106:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   gateway-service:
     container_name: gateway-service
     build: ./quraan-agent/services/gateway-service
@@ -194,6 +206,7 @@ services:
       - GENERATION_SERVICE_URL=http://generation-service:8000
       - PRONUNCIATION_SERVICE_URL=http://pronunciation-service:8000
       - PRONUNCIATION_SERVICE_WS_URL=ws://pronunciation-service:8000
+      - ACCOUNT_SERVICE_URL=http://account-service:8000
     restart: always
     ports:
       # Cutover complete: every flow verified against the legacy monolith
@@ -206,6 +219,7 @@ services:
       - retrieval-service
       - generation-service
       - pronunciation-service
+      - account-service
 
 networks:
   default:
