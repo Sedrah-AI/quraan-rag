@@ -1,0 +1,475 @@
+{
+  "surah_id": 1,
+  "surah_name_en": "The Opening",
+  "surah_name_ar": "الفاتحة",
+  "ayahs": [
+    {
+      "surah_id": 1,
+      "ayah_id": 1,
+      "ayah_ar": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+      "ayah_en": "In the name of Allah, the Entirely Merciful, the Especially Merciful.",
+      "words": [
+        "بِسْمِ",
+        "اللَّهِ",
+        "الرَّحْمَنِ",
+        "الرَّحِيمِ"
+      ],
+      "audio_asset": "assets/audio/001001.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 680,
+          "end_ms": 980,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 2,
+          "start_ms": 1080,
+          "end_ms": 1660,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 3,
+          "start_ms": 1820,
+          "end_ms": 2820,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 4,
+          "start_ms": 2960,
+          "end_ms": 4160,
+          "confidence": 0.8348870328913235
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 4740,
+          "end_ms": 5020,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 2,
+          "start_ms": 5160,
+          "end_ms": 5700,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 3,
+          "start_ms": 5880,
+          "end_ms": 6940,
+          "confidence": 0.8348870328913235
+        },
+        {
+          "word_index": 4,
+          "start_ms": 7040,
+          "end_ms": 8760,
+          "confidence": 0.8348870328913235
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 2,
+      "ayah_ar": "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
+      "ayah_en": "[All] praise is [due] to Allah, Lord of the worlds -",
+      "words": [
+        "الْحَمْدُ",
+        "لِلَّهِ",
+        "رَبِّ",
+        "الْعَالَمِينَ"
+      ],
+      "audio_asset": "assets/audio/001002.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 320,
+          "end_ms": 980,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 2,
+          "start_ms": 1180,
+          "end_ms": 1940,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 3,
+          "start_ms": 2180,
+          "end_ms": 2560,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 4,
+          "start_ms": 2720,
+          "end_ms": 4220,
+          "confidence": 0.601485827309421
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 5000,
+          "end_ms": 5800,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 2,
+          "start_ms": 5980,
+          "end_ms": 6760,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 3,
+          "start_ms": 6980,
+          "end_ms": 7360,
+          "confidence": 0.601485827309421
+        },
+        {
+          "word_index": 4,
+          "start_ms": 7520,
+          "end_ms": 9020,
+          "confidence": 0.601485827309421
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 3,
+      "ayah_ar": "الرَّحْمَٰنِ الرَّحِيمِ",
+      "ayah_en": "The Entirely Merciful, the Especially Merciful,",
+      "words": [
+        "الرَّحْمَنِ",
+        "الرَّحِيمِ"
+      ],
+      "audio_asset": "assets/audio/001003.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 240,
+          "end_ms": 1340,
+          "confidence": 0.6946059384358488
+        },
+        {
+          "word_index": 2,
+          "start_ms": 1500,
+          "end_ms": 2780,
+          "confidence": 0.6946059384358488
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 3640,
+          "end_ms": 4860,
+          "confidence": 0.6946059384358488
+        },
+        {
+          "word_index": 2,
+          "start_ms": 5000,
+          "end_ms": 6680,
+          "confidence": 0.6946059384358488
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 4,
+      "ayah_ar": "مَالِكِ يَوْمِ الدِّينِ",
+      "ayah_en": "Sovereign of the Day of Recompense.",
+      "words": [
+        "مَالِكِ",
+        "يَوْمِ",
+        "الدِّينِ"
+      ],
+      "audio_asset": "assets/audio/001004.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 120,
+          "end_ms": 820,
+          "confidence": 0.844108563902203
+        },
+        {
+          "word_index": 2,
+          "start_ms": 1040,
+          "end_ms": 1460,
+          "confidence": 0.844108563902203
+        },
+        {
+          "word_index": 3,
+          "start_ms": 1640,
+          "end_ms": 2640,
+          "confidence": 0.844108563902203
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 3660,
+          "end_ms": 4360,
+          "confidence": 0.844108563902203
+        },
+        {
+          "word_index": 2,
+          "start_ms": 4560,
+          "end_ms": 5020,
+          "confidence": 0.844108563902203
+        },
+        {
+          "word_index": 3,
+          "start_ms": 5180,
+          "end_ms": 6180,
+          "confidence": 0.844108563902203
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 5,
+      "ayah_ar": "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
+      "ayah_en": "It is You we worship and You we ask for help.",
+      "words": [
+        "إِيَّاكَ",
+        "نَعْبُدُ",
+        "وَإِيَّاكَ",
+        "نَسْتَعِينُ"
+      ],
+      "audio_asset": "assets/audio/001005.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 120,
+          "end_ms": 960,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 2,
+          "start_ms": 1180,
+          "end_ms": 1800,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 3,
+          "start_ms": 2020,
+          "end_ms": 3080,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 4,
+          "start_ms": 3260,
+          "end_ms": 4640,
+          "confidence": 0.6629028855664739
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 5280,
+          "end_ms": 6120,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 2,
+          "start_ms": 6340,
+          "end_ms": 6960,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 3,
+          "start_ms": 7200,
+          "end_ms": 8260,
+          "confidence": 0.6629028855664739
+        },
+        {
+          "word_index": 4,
+          "start_ms": 8420,
+          "end_ms": 9800,
+          "confidence": 0.6629028855664739
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 6,
+      "ayah_ar": "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
+      "ayah_en": "Guide us to the straight path -",
+      "words": [
+        "اهْدِنَا",
+        "الصِّرَاطَ",
+        "الْمُسْتَقِيمَ"
+      ],
+      "audio_asset": "assets/audio/001006.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 60,
+          "end_ms": 640,
+          "confidence": 0.8100669482080766
+        },
+        {
+          "word_index": 2,
+          "start_ms": 700,
+          "end_ms": 1620,
+          "confidence": 0.8100669482080766
+        },
+        {
+          "word_index": 3,
+          "start_ms": 1800,
+          "end_ms": 3400,
+          "confidence": 0.8100669482080766
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 3980,
+          "end_ms": 4560,
+          "confidence": 0.8100669482080766
+        },
+        {
+          "word_index": 2,
+          "start_ms": 4600,
+          "end_ms": 5540,
+          "confidence": 0.8100669482080766
+        },
+        {
+          "word_index": 3,
+          "start_ms": 5720,
+          "end_ms": 7300,
+          "confidence": 0.8100669482080766
+        }
+      ]
+    },
+    {
+      "surah_id": 1,
+      "ayah_id": 7,
+      "ayah_ar": "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
+      "ayah_en": "The path of those upon whom You have bestowed favor, not of those who have evoked [Your] anger or of those who are astray.",
+      "words": [
+        "صِرَاطَ",
+        "الَّذِينَ",
+        "أَنْعَمْتَ",
+        "عَلَيْهِمْ",
+        "غَيْرِ",
+        "الْمَغْضُوبِ",
+        "عَلَيْهِمْ",
+        "وَلَا",
+        "الضَّالِّينَ"
+      ],
+      "audio_asset": "assets/audio/001007.mp3",
+      "teacher_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 40,
+          "end_ms": 620,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 2,
+          "start_ms": 780,
+          "end_ms": 1680,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 3,
+          "start_ms": 1900,
+          "end_ms": 2780,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 4,
+          "start_ms": 2900,
+          "end_ms": 3820,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 5,
+          "start_ms": 4020,
+          "end_ms": 4460,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 6,
+          "start_ms": 4640,
+          "end_ms": 5740,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 7,
+          "start_ms": 5960,
+          "end_ms": 6800,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 8,
+          "start_ms": 7040,
+          "end_ms": 8060,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 9,
+          "start_ms": 10740,
+          "end_ms": 11780,
+          "confidence": 0.7936695493683459
+        }
+      ],
+      "student_timings": [
+        {
+          "word_index": 1,
+          "start_ms": 12080,
+          "end_ms": 12680,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 2,
+          "start_ms": 12800,
+          "end_ms": 13720,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 3,
+          "start_ms": 13920,
+          "end_ms": 14620,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 4,
+          "start_ms": 14800,
+          "end_ms": 15780,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 5,
+          "start_ms": 16060,
+          "end_ms": 16500,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 6,
+          "start_ms": 16820,
+          "end_ms": 17760,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 7,
+          "start_ms": 18020,
+          "end_ms": 18860,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 8,
+          "start_ms": 19080,
+          "end_ms": 19720,
+          "confidence": 0.7936695493683459
+        },
+        {
+          "word_index": 9,
+          "start_ms": 20100,
+          "end_ms": 23840,
+          "confidence": 0.7936695493683459
+        }
+      ]
+    }
+  ]
+}
