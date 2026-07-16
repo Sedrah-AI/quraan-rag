@@ -107,6 +107,31 @@ CREATE INDEX idx_tafsir_ref ON tafsir_passages(surah_id, ayah_id);
 CREATE INDEX idx_word_timings_ref ON ayah_word_timings(surah_id, ayah_id);
 CREATE INDEX idx_mushaf_pages_page ON mushaf_pages(page_number);
 
+-- Word timings for two-voice "Muallim" (teacher) recitations, e.g.
+-- minshawy_teacher - one clip contains the same ayah's words twice
+-- (teacher recites, then a child repeats), so this is a separate table
+-- from ayah_word_timings rather than an overloaded reciter_id there:
+-- 'segment' distinguishes which pass a given word_index belongs to.
+-- Produced by scripts/align_teacher_ayah_words.py (doubled-transcript
+-- CTC forced alignment - see wiki for the two-voice alignment approach
+-- and validation), scoped to surah 1 + surahs 87-114 (kids' memorization
+-- app pilot set), not the full Quran.
+CREATE TABLE teacher_word_timings (
+  surah_id     INTEGER NOT NULL,
+  ayah_id      INTEGER NOT NULL,
+  reciter_id   TEXT NOT NULL REFERENCES reciters(reciter_id),
+  segment      TEXT NOT NULL,  -- 'teacher' | 'student'
+  word_index   INTEGER NOT NULL,
+  start_ms     INTEGER NOT NULL,
+  end_ms       INTEGER NOT NULL,
+  confidence   DOUBLE PRECISION,
+  align_model  TEXT,
+  PRIMARY KEY (surah_id, ayah_id, reciter_id, segment, word_index),
+  FOREIGN KEY (surah_id, ayah_id, word_index) REFERENCES words(surah_id, ayah_id, word_index)
+);
+
+CREATE INDEX idx_teacher_word_timings_ref ON teacher_word_timings(surah_id, ayah_id);
+
 -- Fast substring search for the LIKE-fallback tier (today's _text_search()
 -- in app/server.py, moving to a content-service endpoint) - same fallback
 -- behavior the monolith already has, just made practical at scale.
